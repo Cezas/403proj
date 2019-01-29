@@ -1,0 +1,3 @@
+basic credits text for now.
+
+Big thanks to https://www.pyimagesearch.com/ for helping me learning all this stuff
