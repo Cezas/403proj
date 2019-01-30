@@ -21,7 +21,8 @@ ap.add_argument("-e", "--encodings", required=True,
 args = vars(ap.parse_args())
 
 #**********ADDING IN TRACKING
-tracker = cv2.TrackerMOSSE_create
+#tracker = cv2.TrackerKCF_create()
+tracker = cv2.TrackerMOSSE_create()
 initBB = None
 
 
@@ -52,25 +53,59 @@ while True:
 	# to 500px (to speedup processing)
 	frame = vs.read()
 	frame = imutils.resize(frame, width=500)
-	
-	# convert the input frame from (1) BGR to grayscale (for face
-	# detection) and (2) from BGR to RGB (for face recognition)
-	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-	rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-	
-	# detect faces in the grayscale frame
-	rects = detector.detectMultiScale(gray, scaleFactor=1.1, 
-		minNeighbors=5, minSize=(30, 30),
-		flags=cv2.CASCADE_SCALE_IMAGE)
+	(H, W) = frame.shape[:2]	
+	 # check to see if we are currently tracking an objec
+	if initBB is not None:
+                # grab the new bounding box coordinates of the object
+		(success, box) = tracker.update(frame)
+		print("tracker gives", box)
+                # check to see if the tracking was a success
+		if success:
+			###this seems to fail regardless of what initBB is
+			#(top, right, bottom, left) = [int(v) for v in box]
+			#cv2.rectangle(frame, (left, top), (right, bottom),(0, 255, 0), 2)
 
-	# OpenCV returns bounding box coordinates in (x, y, w, h) order
-	# but we need them in (top, right, bottom, left) order, so we
-	# need to do a bit of reordering
-	boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
+			(x, y, w, h) = [int(v) for v in box]
+			cv2.rectangle(frame, (x, y), (x + w, y + h),
+                              (0, 255, 0), 2)
+
+                # update the FPS counter
+		fps.update()
+		fps.stop()
+
+                # initialize the set of information we'll be displaying on
+                # the frame
+		info = [
+                        ("Tracker","KCF"),
+                        ("Success", "Yes" if success else "No"),
+                        ("FPS", "{:.2f}".format(fps.fps())),
+		]
+
+               	# loop over the info tuples and draw them on our frame
+		for (i, (k, v)) in enumerate(info):
+			text = "{}: {}".format(k, v)
+			cv2.putText(frame, text, (10, H - ((i * 20) + 20)),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 	
 
+	#*******attempt object recognition every 20 frames      
+	elif framecounter%20==0:
 	
-	if framecounter%20==0:
+		# convert the input frame from (1) BGR to grayscale (for face
+		# detection) and (2) from BGR to RGB (for face recognition)
+		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+		rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		
+		# detect faces in the grayscale frame
+		rects = detector.detectMultiScale(gray, scaleFactor=1.1, 
+			minNeighbors=5, minSize=(30, 30),
+			flags=cv2.CASCADE_SCALE_IMAGE)
+	
+		# OpenCV returns bounding box coordinates in (x, y, w, h) order
+		# but we need them in (top, right, bottom, left) order, so we
+		# need to do a bit of reordering
+		boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
+		
+
 
 		# compute the facial embeddings for each face bounding box
 		encodings = face_recognition.face_encodings(rgb, boxes)
@@ -114,13 +149,22 @@ while True:
 				cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX,
 					0.75, (0, 255, 0), 2)
 			
-	
-	
+			#*****once object has been detected, lockon with tracker
+			#---will need to decide targets before this point, 
+			
+			#initBB = boxes[0]
+			(x, y, w, h) = [int(v) for v in rects[0]]
+			initBB = (x,y,w,h) #only takes first thing detected
+			print("face detect gives ",initBB)
+			tracker.init(frame,initBB)
+				
 
 	# display the image to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
-
+	
+	if key==ord("r"): #reset initBB
+		initBB = None
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
 		break
