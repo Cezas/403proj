@@ -1,6 +1,21 @@
 # USAGE
 # python test.py --cascade haarcascade_frontalface_default.xml --encodings encodings.pickle
 
+#TODOTODOTODOTODOTODO CURRENT BUGS AND SHIT TODO TODO TODO
+
+#even if the tracker initializes properly, it might still fail
+
+#RESOLVED - once tracker loses its first catch, it will no longer work.
+#RESOLVED - so, how do i reset the tracker?
+
+#TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO TODO TODO TODO
+
+
+
+
+
+
+
 # import the necessary packages
 from imutils.video import VideoStream
 from imutils.video import FPS
@@ -24,8 +39,8 @@ args = vars(ap.parse_args())
 #tracker = cv2.TrackerKCF_create()
 tracker = cv2.TrackerMOSSE_create()
 initBB = None
-
-
+success = False
+initialized = False
 #*********END CHANGES
 
 
@@ -56,9 +71,10 @@ while True:
 	(H, W) = frame.shape[:2]	
 	 # check to see if we are currently tracking an objec
 	if initBB is not None:
-                # grab the new bounding box coordinates of the object
+		print('INITBB is',initBB)
+		# grab the new bounding box coordinates of the object
 		(success, box) = tracker.update(frame)
-		print("tracker gives", box)
+		print("TRACKER gives", box)
                 # check to see if the tracking was a success
 		if success:
 			###this seems to fail regardless of what initBB is
@@ -68,15 +84,19 @@ while True:
 			(x, y, w, h) = [int(v) for v in box]
 			cv2.rectangle(frame, (x, y), (x + w, y + h),
                               (0, 255, 0), 2)
+		else:
+			initialized = False
+			tracker = cv2.TrackerMOSSE_create()
+			initBB = None
 
-                # update the FPS counter
+		# update the FPS counter
 		fps.update()
 		fps.stop()
 
                 # initialize the set of information we'll be displaying on
                 # the frame
 		info = [
-                        ("Tracker","KCF"),
+                        ("Tracker","variable"),
                         ("Success", "Yes" if success else "No"),
                         ("FPS", "{:.2f}".format(fps.fps())),
 		]
@@ -87,9 +107,9 @@ while True:
 			cv2.putText(frame, text, (10, H - ((i * 20) + 20)),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 	
 
-	#*******attempt object recognition every 20 frames      
-	elif framecounter%20==0:
-	
+	#*******attempt object recognition every 20 frames and  when target is lost      
+	if framecounter%20==0 and not success:
+		print('#######ATTEMPTING DETECTION##########')	
 		# convert the input frame from (1) BGR to grayscale (for face
 		# detection) and (2) from BGR to RGB (for face recognition)
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -155,16 +175,23 @@ while True:
 			#initBB = boxes[0]
 			(x, y, w, h) = [int(v) for v in rects[0]]
 			initBB = (x,y,w,h) #only takes first thing detected
+			print('***********RECOGNIZE ',name,' *****************' )
 			print("face detect gives ",initBB)
-			tracker.init(frame,initBB)
-				
-
+						
+			if not initialized:
+				print('YOU SHOULD NOT SEE THIS MORE THAN ONCE')
+				initialized = tracker.init(frame,initBB)
+				print(initialized)
+			
 	# display the image to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 	
 	if key==ord("r"): #reset initBB
 		initBB = None
+		#tracker = cv2.TrackerMOSSE_create()
+#might need to reset tracker as well
+	#	print("Restarting search")
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
 		break
