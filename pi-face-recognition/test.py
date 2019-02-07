@@ -3,6 +3,12 @@
 
 #TODOTODOTODOTODOTODO CURRENT BUGS AND SHIT TODO TODO TODO
 
+#TODO: measure time it takes to detect faces
+
+#TODO: begin target selection algo
+
+#TODO: switch over to generic object detection
+
 #even if the tracker initializes properly, it might still fail
 
 #RESOLVED - once tracker loses its first catch, it will no longer work.
@@ -41,6 +47,7 @@ tracker = cv2.TrackerMOSSE_create()
 initBB = None
 success = False
 initialized = False
+
 #*********END CHANGES
 
 
@@ -61,6 +68,9 @@ time.sleep(2.0)
 # start the FPS counter
 fps = FPS().start()
 framecounter = 0
+
+starttime = time.time()
+
 # loop over frames from the video file stream
 while True:
 	framecounter = framecounter+1
@@ -71,10 +81,10 @@ while True:
 	(H, W) = frame.shape[:2]	
 	 # check to see if we are currently tracking an objec
 	if initBB is not None:
-		print('INITBB is',initBB)
+		#print('INITBB is',initBB)
 		# grab the new bounding box coordinates of the object
 		(success, box) = tracker.update(frame)
-		print("TRACKER gives", box)
+		#print("TRACKER gives", box)
                 # check to see if the tracking was a success
 		if success:
 			###this seems to fail regardless of what initBB is
@@ -85,10 +95,9 @@ while True:
 			cv2.rectangle(frame, (x, y), (x + w, y + h),
                               (0, 255, 0), 2)
 		else:
-			initialized = False
 			tracker = cv2.TrackerMOSSE_create()
 			initBB = None
-
+			initialized = False
 		# update the FPS counter
 		fps.update()
 		fps.stop()
@@ -140,6 +149,9 @@ while True:
 		
 				# check to see if we have found a match
 			if True in matches:
+				#match detected, mark time
+				print('Face detected in',round(time.time()-starttime,2),'seconds')
+				starttime = time.time()
 				# find the indexes of all matched faces then initialize a
 				# dictionary to count the total number of times each face
 				# was matched
@@ -176,13 +188,11 @@ while True:
 			(x, y, w, h) = [int(v) for v in rects[0]]
 			initBB = (x,y,w,h) #only takes first thing detected
 			print('***********RECOGNIZE ',name,' *****************' )
-			print("face detect gives ",initBB)
-						
-			if not initialized:
-				print('YOU SHOULD NOT SEE THIS MORE THAN ONCE')
-				initialized = tracker.init(frame,initBB)
-				print(initialized)
+			#print("face detect gives ",initBB)
 			
+			if not initialized:	
+				initialized = tracker.init(frame,initBB)
+				#print(initialized)
 	# display the image to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
