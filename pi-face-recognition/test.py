@@ -1,4 +1,4 @@
-#creds to pyimagesearch for boilerplate code
+#huge creds to pyimagesearch for the boilerplate code of basic detection and tracking
 # USAGE
 # python test.py --cascade haarcascade_frontalface_default.xml --encodings encodings.pickle
 
@@ -60,13 +60,13 @@ framecounter = 0
 #********************MAIN ALGO********************
 # loop over frames from the video file stream
 while True:
-	framecounter = framecounter+1
-	# grab the frame from the threaded video stream and resize it
-	# to 500px (to speedup processing)
+	framecounter = framecounter + 1
+	# grab the frame from the threaded video stream and resize it to 500px (to speedup processing)
 	frame = vs.read()
 	frame = imutils.resize(frame, width=500)
-	(H, W) = frame.shape[:2]  	
-	 # check to see if we are currently tracking an object
+	(H, W) = frame.shape[:2]  #acquire the height and width of the frame and put it into a tuple for later use 	
+	 
+	# check to see if we are currently tracking an object
 	if initBB is not None:
 		#print('INITBB is',initBB)
 		# grab the new bounding box coordinates of the object
@@ -74,9 +74,9 @@ while True:
 		#print("TRACKER gives", box)
                 # check to see if the tracking was a success
 		if success:
-			(x, y, w, h) = [int(v) for v in box]
+			(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
 			cv2.rectangle(frame, (x, y), (x + w, y + h),
-                              (0, 255, 0), 2)
+                              (0, 255, 0), 2) #frame,top left, bottom right, color, thicness
 		#***********if there is no current thing being tracked, restart the tracker entirely
 		else:
 			tracker = cv2.TrackerMOSSE_create()
@@ -102,7 +102,7 @@ while True:
 	
 
 	#*******attempt object recognition every N frames and when target is undetected      
-	if framecounter%detectrate==1 or not success: #i do %==1 as %==0 would have this go off a lot initially
+	if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
 		print('#######ATTEMPTING DETECTION##########')	
 		# convert the input frame from (1) BGR to grayscale (for face
 		# detection) and (2) from BGR to RGB (for face recognition)
@@ -122,7 +122,7 @@ while True:
 		# compute the facial embeddings for each face bounding box
 		encodings = face_recognition.face_encodings(rgb, boxes)
 		names = []
-
+ 
 		# loop over the facial embeddings	
 		for encoding in encodings:
 			# attempt to match each face in the input image to our known
@@ -171,8 +171,8 @@ while True:
 			#************once object has been detected, lockon with tracker
 			#---will need to decide targets before this point, 
 			#initBB = boxes[0]
-			(x, y, w, h) = [int(v) for v in rects[0]]
-			initBB = (x,y,w,h) #only takes first thing detected
+			(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
+			initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
 			print('***********RECOGNIZE ',name,' *****************' )
 			#print("face detect gives ",initBB)		
 			if not initialized:	
@@ -183,10 +183,13 @@ while True:
 	# display the image to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF	
+	
 
+	#*****timer start******
 	if key == ord("t"):
 		print('Starting timer for detection')
 		starttime=time.time()
+	#*******************
 
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
