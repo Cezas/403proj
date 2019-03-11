@@ -5,6 +5,10 @@
 
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
+#PRIORITY: resize tracking box
+#priority: instant relockon
+#priority: general object
+
 #refactor and clean up
 	#move names from object detect to tracker
 #possibly incorporate a hard refresh of the tracker as it can get stuck on differnt things (on Mosse)
@@ -89,8 +93,8 @@ if __name__=="__main__":
 	args = vars(ap.parse_args())
 	
 	#**********INITIALIZING TRACKER & VARIOUS VARS
-	tracker = cv2.TrackerKCF_create()
-	#tracker = cv2.TrackerMOSSE_create()
+	#tracker = cv2.TrackerKCF_create()
+	tracker = cv2.TrackerMOSSE_create()
 	initBB = None #initial bounding box that will encapsulate the object
 	initialized = False #denotes on whether or the tracker was initialized
 	success = False #denotes on whether or not a detection occurred
@@ -124,14 +128,7 @@ if __name__=="__main__":
 	print("[INFO] loading model...")
 	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
-
 	#*********END NET
-
-
-
-
-
-
 
 	# initialize the video stream and allow the camera sensor to warm up
 	print("[INFO] starting video stream...")
@@ -165,25 +162,19 @@ if __name__=="__main__":
                               	(0, 255, 0), 2) #frame,top left, bottom right, color, thicness
 			#***********if there is no current thing being tracked, restart the tracker entirely
 			else:
-				tracker = cv2.TrackerKCF_create()
-				#tracker = cv2.TrackerMOSSE_create()
+				#tracker = cv2.TrackerKCF_create()
+				tracker = cv2.TrackerMOSSE_create()
 				initBB = None
 				initialized = False
 			#**************
-	#		fps.update()
-	#		fps.stop()	
-	#		print(fps.fps())
-	#		cv2.putText(frame, "{:.2f}".format(fps.fps()), (10, 450), cv2.FONT_HERSHEY_SIMPLEX,0.75, (0, 255, 0), 2)
-
 
 		#*******attempt object recognition every N frames and when target is undetected      
 		if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
 			print('#######ATTEMPTING DETECTION##########')	
-			
+				
 			if False:
 				ssddetect(frame,net,CLASSES,IGNORE)
 			else:
-
 
 				# convert the input frame from (1) BGR to grayscale (for face
 				# detection) and (2) from BGR to RGB (for face recognition)
@@ -249,18 +240,18 @@ if __name__=="__main__":
 						cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX,
 							0.75, (0, 255, 0), 2)
 			
-			#************once object has been detected, lockon with tracker
-			#---will need to decide targets before this point, 
-			#initBB = boxes[0]
-			(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
-			initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
-			print('***********RECOGNIZE ',name,' *****************' )
-			#print("face detect gives ",initBB)		
-			if not initialized:	
-				initialized = tracker.init(frame,initBB)
-				#print(initialized)
-			#******************************
-		
+					#************once object has been detected, lockon with tracker
+					#---will need to decide targets before this point, 
+					#initBB = boxes[0]
+					(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
+					initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
+					print('***********RECOGNIZE ',name,' *****************' )
+					#print("face detect gives ",initBB)		
+					if not initialized:	
+						initialized = tracker.init(frame,initBB)
+						#print(initialized)
+					#******************************
+			
 		# display the image to our screen
 		cv2.imshow("Frame", frame)
 		key = cv2.waitKey(1) & 0xFF	
