@@ -6,6 +6,7 @@
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
 #PRIORITY: resize tracking box
+#good idea: stop detection upon first positive
 #priority: instant relockon
 #priority: general object
 
@@ -45,6 +46,8 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 	net.setInput(blob)
 	detections = net.forward()
 	
+	rects = []	
+
 	# loop over the detections
 	for i in np.arange(0, detections.shape[2]):
 		# extract the confidence (i.e., probability) associated with
@@ -64,6 +67,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 			box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
 			(startX, startY, endX, endY) = box.astype("int")
 			
+			rects.append(box)			
 			# draw the prediction on the frame
 			label = "{}: {:.2f}%".format(CLASSES[idx],
         			confidence * 100)
@@ -73,7 +77,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 			cv2.putText(frame, label, (startX, y),
         			cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
 			
-			return frame
+	return rects
 ##############END FUNCCTIONS	
 
 
@@ -118,8 +122,8 @@ if __name__=="__main__":
         "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
         "sofa", "train", "tvmonitor"]
 	IGNORE =  ["background", "aeroplane", "bicycle", "bird", "boat",
-        "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
-        "dog", "horse", "motorbike", "pottedplant", "sheep",
+         "bus", "car", "cat", "chair", "cow", "diningtable",
+        "dog", "horse", "motorbike", "pottedplant","person", "sheep",
         "sofa", "train", "tvmonitor"]
 
 	COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
@@ -172,8 +176,19 @@ if __name__=="__main__":
 		if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
 			print('#######ATTEMPTING DETECTION##########')	
 				
-			if False:
-				ssddetect(frame,net,CLASSES,IGNORE)
+			if True:
+				rects = ssddetect(frame,net,CLASSES,IGNORE)
+				if len(rects):
+					#************once object has been detected, lockon with tracker
+					(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
+					initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
+	#				print('***********RECOGNIZE ',name,' *****************' )
+					#print("face detect gives ",initBB)             
+					if not initialized:     
+        					initialized = tracker.init(frame,initBB)
+        					#print(initialized)
+					#******************************
+					
 			else:
 
 				# convert the input frame from (1) BGR to grayscale (for face
