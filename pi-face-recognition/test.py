@@ -5,10 +5,9 @@
 
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
-#PRIORITY: resize tracking box
-#good idea: stop detection upon first positive
+#PRIORITY: resize tracking box to match distance changes
+#idea? stop detection upon first positive
 #priority: instant relockon
-#priority: general object
 
 #refactor and clean up
 	#move names from object detect to tracker
@@ -97,9 +96,11 @@ if __name__=="__main__":
 	args = vars(ap.parse_args())
 	
 	#**********INITIALIZING TRACKER & VARIOUS VARS
+	widthsize = 500
 	#tracker = cv2.TrackerKCF_create()
 	tracker = cv2.TrackerMOSSE_create()
 	initBB = None #initial bounding box that will encapsulate the object
+	lastgoodbox = None
 	initialized = False #denotes on whether or the tracker was initialized
 	success = False #denotes on whether or not a detection occurred
 	detectrate = 100000
@@ -150,7 +151,7 @@ if __name__=="__main__":
 		framecounter = framecounter + 1
 		# grab the frame from the threaded video stream and resize it to 500px (to speedup processing)
 		frame = vs.read()
-		frame = imutils.resize(frame, width=500)
+		frame = imutils.resize(frame, width=widthsize)
 		(H, W) = frame.shape[:2]  #acquire the height and width of the frame and put it into a tuple for later use 	
 	 	
 		# check to see if we are currently tracking an object
@@ -162,27 +163,45 @@ if __name__=="__main__":
                 	# check to see if the tracking was a success
 			if success:
 				(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
+				lastgoodbox = (x,y,w,h)
+				centroidx = x+w/2
+				centroidy= y+h/2
+				#print(centroidx, widthsize*.9, widthsize*.1)
 				cv2.rectangle(frame, (x, y), (x + w, y + h),
                               	(0, 255, 0), 2) #frame,top left, bottom right, color, thicness
-			#***********if there is no current thing being tracked, restart the tracker entirely
+				if centroidx>=.9*widthsize or centroidx<=.1*widthsize or centroidy>=.9*widthsize or centroidy<=.1*widthsize  :
+					tracker = cv2.TrackerMOSSE_create()
+					initBB = None
+					initialized = False
+					success = False
+					lastgoodbox = None
+					
+
+			elif lastgoodbox is not None:
+				tracker.init(frame,lastgoodbox)
+				cv2.rectangle(frame, (x, y), (x + w, y + h),
+                                (0, 255, 0), 2) #frame,top left, bottom right, color, thicness
+				success = True
+			
 			else:
 				#tracker = cv2.TrackerKCF_create()
 				tracker = cv2.TrackerMOSSE_create()
 				initBB = None
 				initialized = False
+				lastgoodbox = None
 			#**************
 
 		#*******attempt object recognition every N frames and when target is undetected      
 		if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
 			print('#######ATTEMPTING DETECTION##########')	
 				
-			if True:
+			if False:
 				rects = ssddetect(frame,net,CLASSES,IGNORE)
 				if len(rects):
 					#************once object has been detected, lockon with tracker
 					(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
 					initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
-	#				print('***********RECOGNIZE ',name,' *****************' )
+					#print('***********RECOGNIZE ',name,' *****************' )
 					#print("face detect gives ",initBB)             
 					if not initialized:     
         					initialized = tracker.init(frame,initBB)
