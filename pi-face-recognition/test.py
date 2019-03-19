@@ -5,9 +5,13 @@
 
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
+#PRIORITY: optimize detection time (esp for ssd)
+#PRIORITY: establish serial comm protocol/conversion algo
+#PRIORITY: figure out keyboard input w/ cv2
 #PRIORITY: resize tracking box to match distance changes
+#idea: if tracker immobile for a while, restart
 #idea? stop detection upon first positive
-#priority: instant relockon
+
 
 #refactor and clean up
 	#move names from object detect to tracker
@@ -34,6 +38,16 @@ import cv2
 import numpy as np
 
 ###############functions##########################
+def inittracker():
+	tracker = cv2.TrackerMOSSE_create()
+	initBB = None #initial bounding box that will encapsulate the object
+	lastgoodbox = None
+	initialized = False #denotes on whether or the tracker was initialized
+
+	return (tracker,initBB,lastgoodbox,initialized)
+
+
+
 def ssddetect(frame,net,CLASSES,IGNORE):
 
 	(h, w) = frame.shape[:2]
@@ -83,6 +97,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 
 
 if __name__=="__main__":	
+	
 	# construct the argument parser and parse the arguments
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-c", "--cascade", required=True,
@@ -98,14 +113,17 @@ if __name__=="__main__":
 	#**********INITIALIZING TRACKER & VARIOUS VARS
 	widthsize = 500
 	#tracker = cv2.TrackerKCF_create()
-	tracker = cv2.TrackerMOSSE_create()
-	initBB = None #initial bounding box that will encapsulate the object
-	lastgoodbox = None
-	initialized = False #denotes on whether or the tracker was initialized
+	#tracker = cv2.TrackerMOSSE_create()
+	#initBB = None #initial bounding box that will encapsulate the object
+	#lastgoodbox = None
+	#initialized = False #denotes on whether or the tracker was initialized
+	(tracker,initBB,lastgoodbox,initialized) = inittracker()
+
 	success = False #denotes on whether or not a detection occurred
 	detectrate = 100000
 	#detectrate = 270  #how many frames pass until object detection force checks again
 	starttime = None #initially none, will be manually determined thru user input
+	usingSSD = False 
 	#*********END TRACKER INIT
 	
 	# load the known faces and embeddings along with OpenCV's Haar
@@ -170,12 +188,12 @@ if __name__=="__main__":
 				cv2.rectangle(frame, (x, y), (x + w, y + h),
                               	(0, 255, 0), 2) #frame,top left, bottom right, color, thicness
 				if centroidx>=.9*widthsize or centroidx<=.1*widthsize or centroidy>=.9*widthsize or centroidy<=.1*widthsize  :
-					tracker = cv2.TrackerMOSSE_create()
-					initBB = None
-					initialized = False
+					#tracker = cv2.TrackerMOSSE_create()
+					#initBB = None
+					#initialized = False
+					#lastgoodbox = None
+					(tracker,initBB,lastgoodbox,initialized) = inittracker()
 					success = False
-					lastgoodbox = None
-					
 
 			elif lastgoodbox is not None:
 				tracker.init(frame,lastgoodbox)
@@ -185,17 +203,19 @@ if __name__=="__main__":
 			
 			else:
 				#tracker = cv2.TrackerKCF_create()
-				tracker = cv2.TrackerMOSSE_create()
-				initBB = None
-				initialized = False
+				#tracker = cv2.TrackerMOSSE_create()
+				#initBB = None
+				#initialized = False
+				(tracker,initBB,lastgoodbox,initialized) = inittracker()
+
 				lastgoodbox = None
 			#**************
 
 		#*******attempt object recognition every N frames and when target is undetected      
 		if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
-			print('#######ATTEMPTING DETECTION##########')	
+			#print('#######ATTEMPTING DETECTION##########')	
 				
-			if False:
+			if usingSSD:
 				rects = ssddetect(frame,net,CLASSES,IGNORE)
 				if len(rects):
 					#************once object has been detected, lockon with tracker
@@ -288,15 +308,26 @@ if __name__=="__main__":
 			
 		# display the image to our screen
 		cv2.imshow("Frame", frame)
+		#key = input()
 		key = cv2.waitKey(1) & 0xFF	
-		
-	
+
+		if key == ord("s") and not usingSSD:
+			print('Switching targets, using SSD')
+			usingSSD = True
+			(tracker,initBB,lastgoodbox,initialized) = inittracker()
+			success = False
+		if key == ord("h") and usingSSD:
+			print('Switching targets, face detect')
+			usingSSD = False
+			(tracker,initBB,lastgoodbox,initialized) = inittracker()
+			success = False
 		#*****timer start******
 		if key == ord("t"):
 			print('Starting timer for detection')
 			starttime=time.time()
 		#*******************
 	
+
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
 			break
