@@ -7,9 +7,8 @@
 
 #PRIORITY: optimize detection time (esp for ssd)
 #PRIORITY: establish serial comm protocol/conversion algo
-#PRIORITY: figure out keyboard input w/ cv2
 #PRIORITY: resize tracking box to match distance changes
-#idea: if tracker immobile for a while, restart
+#idea: if tracker immobile for a while, redetect
 #idea? stop detection upon first positive
 
 
@@ -31,6 +30,7 @@ import argparse
 import imutils
 import pickle
 import time
+import serial
 import cv2
 #import picamera
 #from multiprocessing import Process
@@ -49,10 +49,6 @@ def inittracker():
 
 
 def ssddetect(frame,net,CLASSES,IGNORE):
-	#startX=0
-	#startY=0 
-	#endX=0
-	#endY = 0
 	(h, w) = frame.shape[:2]
 	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
                 0.007843, (300, 300), 127.5)
@@ -114,14 +110,19 @@ if __name__=="__main__":
 	args = vars(ap.parse_args())
 	
 	#**********INITIALIZING TRACKER & VARIOUS VARS
-	widthsize = 500
-	#tracker = cv2.TrackerKCF_create()
-	#tracker = cv2.TrackerMOSSE_create()
-	#initBB = None #initial bounding box that will encapsulate the object
-	#lastgoodbox = None
-	#initialized = False #denotes on whether or the tracker was initialized
-	(tracker,initBB,lastgoodbox,initialized) = inittracker()
+	
+	ser = serial.Serial(    
+	port='/dev/ttyS0',
+	baudrate = 9600,
+	parity=serial.PARITY_NONE,
+	stopbits=serial.STOPBITS_ONE,
+	bytesize=serial.EIGHTBITS,
+	timeout=1
+	)
 
+	
+	widthsize = 500
+	(tracker,initBB,lastgoodbox,initialized) = inittracker()
 	success = False #denotes on whether or not a detection occurred
 	detectrate = 100000
 	#detectrate = 270  #how many frames pass until object detection force checks again
@@ -156,9 +157,9 @@ if __name__=="__main__":
 	# load our serialized model from disk
 	print("[INFO] loading model...")
 	
-	#net = cv2.dnn.readNetFromCaffe('ssd_mobilenet_v1_coco_2017_11_17.pbtxt.txt','MobileNetSSD_deploy.caffemodel')
-	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
-	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','mscoco_label_map.pbtxt.txt')
+	#net = cv2.dnn.readNetFromTensorflow('frozen2.pb','labelmap.pbtxt')
+	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"]) #default
+	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','graph.pbtxt') #compiles but no detections
 	#*********END NET
 
 	# initialize the video stream and allow the camera sensor to warm up
@@ -196,12 +197,17 @@ if __name__=="__main__":
 				cv2.rectangle(frame, (x, y), (x + w, y + h),
                               	(0, 255, 0), 2) #frame,top left, bottom right, color, thicness
 				if centroidx>=.9*widthsize or centroidx<=.1*widthsize or centroidy>=.9*widthsize or centroidy<=.1*widthsize  :
-					#tracker = cv2.TrackerMOSSE_create()
-					#initBB = None
-					#initialized = False
-					#lastgoodbox = None
 					(tracker,initBB,lastgoodbox,initialized) = inittracker()
 					success = False
+				
+	
+				#serial writing, make sure to convert to 0-255 range
+				scalingfactor = 255/widthsize
+				print(centroidx)
+				print('converted',int(centroidx*scalingfactor))
+				ser.write(chr(int(centroidx*scalingfactor)).encode())
+				#ser.write(b'camsucks')
+				time.sleep(1)
 
 			elif lastgoodbox is not None:
 				tracker.init(frame,lastgoodbox)
@@ -210,10 +216,6 @@ if __name__=="__main__":
 				success = True
 			
 			else:
-				#tracker = cv2.TrackerKCF_create()
-				#tracker = cv2.TrackerMOSSE_create()
-				#initBB = None
-				#initialized = False
 				(tracker,initBB,lastgoodbox,initialized) = inittracker()
 
 				lastgoodbox = None
