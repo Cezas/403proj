@@ -49,7 +49,10 @@ def inittracker():
 
 
 def ssddetect(frame,net,CLASSES,IGNORE):
-
+	#startX=0
+	#startY=0 
+	#endX=0
+	#endY = 0
 	(h, w) = frame.shape[:2]
 	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
                 0.007843, (300, 300), 127.5)
@@ -60,7 +63,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 	detections = net.forward()
 	
 	rects = []	
-
+	
 	# loop over the detections
 	for i in np.arange(0, detections.shape[2]):
 		# extract the confidence (i.e., probability) associated with
@@ -79,7 +82,6 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 
 			box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
 			(startX, startY, endX, endY) = box.astype("int")
-			
 			rects.append(box)			
 			# draw the prediction on the frame
 			label = "{}: {:.2f}%".format(CLASSES[idx],
@@ -89,8 +91,9 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 			y = startY - 15 if startY - 15 > 15 else startY + 15
 			cv2.putText(frame, label, (startX, y),
         			cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
-			
-	return rects
+	
+	#print(rects)
+	return rects			
 ##############END FUNCCTIONS	
 
 
@@ -136,6 +139,9 @@ if __name__=="__main__":
 
 	# initialize the list of class labels MobileNet SSD was trained to
 	# detect, then generate a set of bounding box colors for each class
+	
+	#CLASSES = ["bottle"]
+	#IGNORE = ["person"]
 	CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
         "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
         "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
@@ -149,8 +155,10 @@ if __name__=="__main__":
 
 	# load our serialized model from disk
 	print("[INFO] loading model...")
+	
+	#net = cv2.dnn.readNetFromCaffe('ssd_mobilenet_v1_coco_2017_11_17.pbtxt.txt','MobileNetSSD_deploy.caffemodel')
 	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
-
+	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','mscoco_label_map.pbtxt.txt')
 	#*********END NET
 
 	# initialize the video stream and allow the camera sensor to warm up
@@ -219,15 +227,14 @@ if __name__=="__main__":
 				rects = ssddetect(frame,net,CLASSES,IGNORE)
 				if len(rects):
 					#************once object has been detected, lockon with tracker
-					(x, y, w, h) = [int(v) for v in rects[0]] #only takes first thing detected for now
-					initBB = (x,y,w,h) #this value of initBB will be used for the tracker input
+					(x, y, x2, y2) = [int(v) for v in rects[0]] #only takes first thing detected for now
+					initBB = (x,y,x2-x,y2-y) #this value of initBB will be used for the tracker input
 					#print('***********RECOGNIZE ',name,' *****************' )
 					#print("face detect gives ",initBB)             
 					if not initialized:     
         					initialized = tracker.init(frame,initBB)
         					#print(initialized)
 					#******************************
-					
 			else:
 
 				# convert the input frame from (1) BGR to grayscale (for face
