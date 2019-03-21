@@ -5,6 +5,10 @@
 
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
+###BIG IDEA
+#run a local redetect within the tracking box, that should handle distance issue & false positives
+
+
 #PRIORITY: optimize detection time (esp for ssd)
 #PRIORITY: establish serial comm protocol/conversion algo
 #PRIORITY: resize tracking box to match distance changes
@@ -32,7 +36,6 @@ import pickle
 import time
 import serial
 import cv2
-#import picamera
 #from multiprocessing import Process
 #from multiprocessing import Queue
 import numpy as np
@@ -50,9 +53,8 @@ def inittracker():
 
 def ssddetect(frame,net,CLASSES,IGNORE):
 	(h, w) = frame.shape[:2]
-	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
-                0.007843, (300, 300), 127.5)
-	
+	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (320, 320)),                0.007843, (320, 320), 127.5)
+	#cv2.resize(frame, (300, 300))
 	# pass the blob through the network and obtain the detections and
 	# predictions
 	net.setInput(blob)
@@ -107,6 +109,10 @@ if __name__=="__main__":
         	help="path to Caffe 'deploy' prototxt file")
 	ap.add_argument("-m", "--model", required=True,
         	help="path to Caffe pre-trained model")
+	ap.add_argument("-s", "--serialwrite", required=True,
+                help="say yes if writing to serial")
+
+	
 	args = vars(ap.parse_args())
 	
 	#**********INITIALIZING TRACKER & VARIOUS VARS
@@ -121,10 +127,11 @@ if __name__=="__main__":
 	)
 
 	
-	widthsize = 500
+	widthsize = 350
 	(tracker,initBB,lastgoodbox,initialized) = inittracker()
 	success = False #denotes on whether or not a detection occurred
 	detectrate = 100000
+	redetectrate = 50
 	#detectrate = 270  #how many frames pass until object detection force checks again
 	starttime = None #initially none, will be manually determined thru user input
 	usingSSD = False 
@@ -141,8 +148,8 @@ if __name__=="__main__":
 	# initialize the list of class labels MobileNet SSD was trained to
 	# detect, then generate a set of bounding box colors for each class
 	
-	#CLASSES = ["bottle"]
-	#IGNORE = ["person"]
+	#CLASSES = ["face"]
+	#IGNORE = ["background"]
 	CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
         "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
         "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
@@ -156,10 +163,9 @@ if __name__=="__main__":
 
 	# load our serialized model from disk
 	print("[INFO] loading model...")
-	
-	#net = cv2.dnn.readNetFromTensorflow('frozen2.pb','labelmap.pbtxt')
+	#WORKING TENSORFLOW SET
+	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','ssd_mobilenet_v1_coco_2017_11_17.pbtxt.txt')
 	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"]) #default
-	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','graph.pbtxt') #compiles but no detections
 	#*********END NET
 
 	# initialize the video stream and allow the camera sensor to warm up
@@ -176,7 +182,6 @@ if __name__=="__main__":
 	# loop over frames from the video file stream
 	while True:
 		framecounter = framecounter + 1
-		# grab the frame from the threaded video stream and resize it to 500px (to speedup processing)
 		frame = vs.read()
 		frame = imutils.resize(frame, width=widthsize)
 		(H, W) = frame.shape[:2]  #acquire the height and width of the frame and put it into a tuple for later use 	
@@ -188,6 +193,15 @@ if __name__=="__main__":
 			(success, box) = tracker.update(frame)
 			#print("TRACKER gives", box)
                 	# check to see if the tracking was a success
+			#forced redetect on the current tracking frame
+
+			print(success,framecounter,redetectrate)
+			if success and framecounter%redetectrate==0 and framecounter >= redetectrate:
+				print("d0")
+				success = False
+				lastgoodbox = None
+				(x, y, w, h) = [int(v) for v in box] 
+				frame = frame[y:y+h, x:x+w]
 			if success:
 				(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
 				lastgoodbox = (x,y,w,h)
@@ -199,16 +213,24 @@ if __name__=="__main__":
 				if centroidx>=.9*widthsize or centroidx<=.1*widthsize or centroidy>=.9*widthsize or centroidy<=.1*widthsize  :
 					(tracker,initBB,lastgoodbox,initialized) = inittracker()
 					success = False
-				
+					
+				#************serial writing, make sure to convert to 0-255 range
+				if args["serialwrite"]=='yes':
+					scalingfactor = 255/widthsize
+					print(centroidx,centroidy,w,h)
+					#print('converted centx',int(centroidx*scalingfactor))
+					#print('converted centy',int(centroidy*scalingfactor))
+					#print('converted w',int(w*scalingfactor))
+					#print('converted h',int(h*scalingfactor))
 	
-				#serial writing, make sure to convert to 0-255 range
-				scalingfactor = 255/widthsize
-				print(centroidx)
-				print('converted',int(centroidx*scalingfactor))
-				ser.write(chr(int(centroidx*scalingfactor)).encode())
-				#ser.write(b'camsucks')
-				time.sleep(1)
-
+					ser.write(b'O')
+					ser.write(chr(int(centroidx*scalingfactor)).encode())
+					ser.write(chr(int(centroidy*scalingfactor)).encode())
+					ser.write(chr(int(w*scalingfactor)).encode())
+					ser.write(chr(int(h*scalingfactor)).encode())
+					ser.write(b'C')
+					time.sleep(1)
+					
 			elif lastgoodbox is not None:
 				tracker.init(frame,lastgoodbox)
 				cv2.rectangle(frame, (x, y), (x + w, y + h),
