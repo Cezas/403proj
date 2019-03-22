@@ -185,7 +185,8 @@ if __name__=="__main__":
 		frame = vs.read()
 		frame = imutils.resize(frame, width=widthsize)
 		(H, W) = frame.shape[:2]  #acquire the height and width of the frame and put it into a tuple for later use 	
-	 	
+		innerframe = None
+		innerrects = None
 		# check to see if we are currently tracking an object
 		if initBB is not None:
 			#print('INITBB is',initBB)
@@ -197,11 +198,24 @@ if __name__=="__main__":
 
 			print(success,framecounter,redetectrate)
 			if success and framecounter%redetectrate==0 and framecounter >= redetectrate:
-				print("d0")
-				success = False
-				lastgoodbox = None
-				(x, y, w, h) = [int(v) for v in box] 
-				frame = frame[y:y+h, x:x+w]
+				#print("redetecting")
+				(x, y, w, h) = [int(v) for v in lastgoodbox] 
+				innerframe = frame[y:y+h, x:x+w]
+				gray = cv2.cvtColor(innerframe, cv2.COLOR_BGR2GRAY)
+				# detect faces in the grayscale frame
+				innerrects = detector.detectMultiScale(gray, scaleFactor=1.1, 
+                                        minNeighbors=5, minSize=(30, 30),
+                                        flags=cv2.CASCADE_SCALE_IMAGE)
+				#print(innerrects[0],len(innerrects[0]))
+				
+				if len(innerrects) != 0:
+					(a, b, c, d) = [int(v) for v in innerrects[0]]
+					(tracker,initBB,lastgoodbox,initialized) = inittracker()
+					initBB = (x+a,y+b,c,d)
+					initialized = tracker.init(frame,initBB)
+				else:
+					success = False
+					lastgoodbox = None
 			if success:
 				(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
 				lastgoodbox = (x,y,w,h)
@@ -236,10 +250,10 @@ if __name__=="__main__":
 				cv2.rectangle(frame, (x, y), (x + w, y + h),
                                 (0, 255, 0), 2) #frame,top left, bottom right, color, thicness
 				success = True
+				
 			
 			else:
 				(tracker,initBB,lastgoodbox,initialized) = inittracker()
-
 				lastgoodbox = None
 			#**************
 
@@ -265,7 +279,7 @@ if __name__=="__main__":
 				# detection) and (2) from BGR to RGB (for face recognition)
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 				rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-				
+					
 				# detect faces in the grayscale frame
 				rects = detector.detectMultiScale(gray, scaleFactor=1.1, 
 					minNeighbors=5, minSize=(30, 30),
