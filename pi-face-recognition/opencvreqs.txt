@@ -1,0 +1,13 @@
+Click==7.0
+dlib==19.16.0
+face-recognition==1.2.3
+face-recognition-models==0.3.0
+imutils==0.5.2
+numpy==1.12.1
+opencv-contrib-python==3.4.4.19
+picamera==1.13
+Pillow==5.4.1
+pynput==1.4
+pyserial==3.4
+python-xlib==0.25
+six==1.12.0
