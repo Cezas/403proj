@@ -6,14 +6,9 @@
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
 ###BIG IDEA
-#run a local redetect within the tracking box, that should handle distance issue & false positives
 
-
+#idea: adjustlastgoodbox to have lockon manner as resize
 #PRIORITY: optimize detection time (esp for ssd)
-#PRIORITY: establish serial comm protocol/conversion algo
-#PRIORITY: resize tracking box to match distance changes
-#idea: if tracker immobile for a while, redetect
-#idea? stop detection upon first positive
 
 
 #refactor and clean up
@@ -53,16 +48,21 @@ def inittracker():
 
 def ssddetect(frame,net,CLASSES,IGNORE):
 	(h, w) = frame.shape[:2]
-	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (320, 320)),                0.007843, (320, 320), 127.5)
+	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (200, 200)),                0.007843, (300, 300), 127.5)
 	#cv2.resize(frame, (300, 300))
 	# pass the blob through the network and obtain the detections and
 	# predictions
 	net.setInput(blob)
+	#inp = np.random.standard_normal([1, 28, 28, 1]).astype(np.float32)
+	#net.setInput(inp.transpose(0, 3, 1, 2))
 	detections = net.forward()
 	
 	rects = []	
-	
+
+	#print(detections.shape[2])	
 	# loop over the detections
+	if detections.shape[2] == 1:
+		return rects
 	for i in np.arange(0, detections.shape[2]):
 		# extract the confidence (i.e., probability) associated with
 		# the prediction
@@ -131,10 +131,10 @@ if __name__=="__main__":
 	(tracker,initBB,lastgoodbox,initialized) = inittracker()
 	success = False #denotes on whether or not a detection occurred
 	detectrate = 100000
-	redetectrate = 50
+	redetectrate = 100000
 	#detectrate = 270  #how many frames pass until object detection force checks again
 	starttime = None #initially none, will be manually determined thru user input
-	usingSSD = False 
+	usingSSD = True #False 
 	#*********END TRACKER INIT
 	
 	# load the known faces and embeddings along with OpenCV's Haar
@@ -148,7 +148,7 @@ if __name__=="__main__":
 	# initialize the list of class labels MobileNet SSD was trained to
 	# detect, then generate a set of bounding box colors for each class
 	
-	#CLASSES = ["face"]
+	#CLASSES = ["T-shirt/top","Sneaker"]
 	#IGNORE = ["background"]
 	CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
         "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
@@ -163,6 +163,9 @@ if __name__=="__main__":
 
 	# load our serialized model from disk
 	print("[INFO] loading model...")
+	
+	#net = cv2.dnn.readNetFromTensorflow('/home/pi/403proj/howdoneuralnet/frozen_inference_graph_face.pb','/home/pi/403proj/howdoneuralnet/face.pbtxt')
+
 	#WORKING TENSORFLOW SET
 	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','ssd_mobilenet_v1_coco_2017_11_17.pbtxt.txt')
 	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"]) #default
@@ -196,17 +199,16 @@ if __name__=="__main__":
                 	# check to see if the tracking was a success
 			#forced redetect on the current tracking frame
 
-			print(success,framecounter,redetectrate)
+			print(success,lastgoodbox,framecounter,redetectrate)
 			if success and framecounter%redetectrate==0 and framecounter >= redetectrate:
 				#print("redetecting")
-				(x, y, w, h) = [int(v) for v in lastgoodbox] 
+				(x, y, w, h) = [int(v) for v in initBB] 
 				innerframe = frame[y:y+h, x:x+w]
 				gray = cv2.cvtColor(innerframe, cv2.COLOR_BGR2GRAY)
 				# detect faces in the grayscale frame
 				innerrects = detector.detectMultiScale(gray, scaleFactor=1.1, 
                                         minNeighbors=5, minSize=(30, 30),
                                         flags=cv2.CASCADE_SCALE_IMAGE)
-				#print(innerrects[0],len(innerrects[0]))
 				
 				if len(innerrects) != 0:
 					(a, b, c, d) = [int(v) for v in innerrects[0]]
@@ -244,14 +246,18 @@ if __name__=="__main__":
 					ser.write(chr(int(h*scalingfactor)).encode())
 					ser.write(b'C')
 					time.sleep(1)
-					
-			elif lastgoodbox is not None:
-				tracker.init(frame,lastgoodbox)
-				cv2.rectangle(frame, (x, y), (x + w, y + h),
-                                (0, 255, 0), 2) #frame,top left, bottom right, color, thicness
-				success = True
-				
 			
+			#disable relockon for now		
+			#elif lastgoodbox is not None:
+			#	print("LOCKON")
+			#	tempbox = lastgoodbox
+			#	(tracker,initBB,lastgoodbox,initialized) = inittracker()
+			#	initBB = tempbox
+			#	initialized = tracker.init(frame,initBB)
+			#	print("USING COORDS",initBB)
+			#	cv2.rectangle(frame, (x, y), (x + w, y + h),
+                        #       (0, 255, 0), 2) #frame,top left, bottom right, color, thicness
+			#	success = True							
 			else:
 				(tracker,initBB,lastgoodbox,initialized) = inittracker()
 				lastgoodbox = None
