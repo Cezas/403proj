@@ -1,7 +1,6 @@
 #huge creds to pyimagesearch for the boilerplate code of basic detection and tracking
 # USAGE
-# python test.py --cascade cascades/haarcascade_frontalface_default.xml --encodings encodings.pickle --prototxt MobileNetSSD_deploy.prototxt.txt --model MobileNetSSD_deploy.caffemodel
-
+#python test.py --cascade cascades/haarcascade_frontalface_default.xml --encodings encodings.pickle --prototxt MobileNetSSD_deploy.prototxt.txt --model MobileNetSSD_deploy.caffemodel --serial no
 
 #TODOTODOTODOTODOTODOTODOTODOTODO
 
@@ -34,7 +33,7 @@ import cv2
 #from multiprocessing import Process
 #from multiprocessing import Queue
 import numpy as np
-
+import gettarget as targ
 ###############functions##########################
 def inittracker():
 	tracker = cv2.TrackerMOSSE_create()
@@ -46,9 +45,9 @@ def inittracker():
 
 
 
-def ssddetect(frame,net,CLASSES,IGNORE):
+def ssddetect(frame,net,CLASSES,IGNORE): #only returns 1st detection for now
 	(h, w) = frame.shape[:2]
-	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (200, 200)),                0.007843, (300, 300), 127.5)
+	blob = cv2.dnn.blobFromImage(cv2.resize(frame, (200, 200)),                0.007843, (200, 200), 127.5)
 	#cv2.resize(frame, (300, 300))
 	# pass the blob through the network and obtain the detections and
 	# predictions
@@ -89,7 +88,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 			y = startY - 15 if startY - 15 > 15 else startY + 15
 			cv2.putText(frame, label, (startX, y),
         			cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
-	
+			return rects	
 	#print(rects)
 	return rects			
 ##############END FUNCCTIONS	
@@ -97,8 +96,7 @@ def ssddetect(frame,net,CLASSES,IGNORE):
 
 
 
-if __name__=="__main__":	
-	
+if __name__=="__main__":		
 	# construct the argument parser and parse the arguments
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-c", "--cascade", required=True,
@@ -126,7 +124,7 @@ if __name__=="__main__":
 	timeout=1
 	)
 
-	
+	target = ' '
 	widthsize = 350
 	(tracker,initBB,lastgoodbox,initialized) = inittracker()
 	success = False #denotes on whether or not a detection occurred
@@ -134,7 +132,7 @@ if __name__=="__main__":
 	redetectrate = 100000
 	#detectrate = 270  #how many frames pass until object detection force checks again
 	starttime = None #initially none, will be manually determined thru user input
-	usingSSD = True #False 
+	usingSSD = False 
 	#*********END TRACKER INIT
 	
 	# load the known faces and embeddings along with OpenCV's Haar
@@ -164,26 +162,33 @@ if __name__=="__main__":
 	# load our serialized model from disk
 	print("[INFO] loading model...")
 	
-	#net = cv2.dnn.readNetFromTensorflow('/home/pi/403proj/howdoneuralnet/frozen_inference_graph_face.pb','/home/pi/403proj/howdoneuralnet/face.pbtxt')
+	#net = cv2.dnn.readNetFromTensorflow('sorted_inference_graph.pb','frost.pbtxt')
 
-	#WORKING TENSORFLOW SET
-	#net = cv2.dnn.readNetFromTensorflow('frozen_inference_graph.pb','ssd_mobilenet_v1_coco_2017_11_17.pbtxt.txt')
 	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"]) #default
 	#*********END NET
 
 	# initialize the video stream and allow the camera sensor to warm up
 	print("[INFO] starting video stream...")
-	#vs = VideoStream(usePiCamera=True).start()
 	vs = VideoStream(src=0).start()	
-	time.sleep(2.0)
-	
-	#fps = FPS().start()
+	time.sleep(2.0)	
 	framecounter = 0
 	
+	#start pinging the website for the target
+	thread1 = targ.myThread(1, "Thread-1", 1)
+	# Start new Threads
+	thread1.start()
+	#thread1.join()
+	
+
+
+
 	
 	#********************MAIN ALGO********************
 	# loop over frames from the video file stream
 	while True:
+		#constantly read the target file (incase it changes)
+		target = targ.readtarget()
+		#print(target)
 		framecounter = framecounter + 1
 		frame = vs.read()
 		frame = imutils.resize(frame, width=widthsize)
@@ -194,7 +199,10 @@ if __name__=="__main__":
 		if initBB is not None:
 			#print('INITBB is',initBB)
 			# grab the new bounding box coordinates of the object
-			(success, box) = tracker.update(frame)
+			#print("right before update", success)
+##################################ERROR#######################################
+			(success, box) =  tracker.update(frame) #does this happen because its too laggy?  frame differences are huge? 
+##################################ERROR###############################3
 			#print("TRACKER gives", box)
                 	# check to see if the tracking was a success
 			#forced redetect on the current tracking frame
@@ -269,6 +277,7 @@ if __name__=="__main__":
 				
 			if usingSSD:
 				rects = ssddetect(frame,net,CLASSES,IGNORE)
+				#print(len(rects))
 				if len(rects):
 					#************once object has been detected, lockon with tracker
 					(x, y, x2, y2) = [int(v) for v in rects[0]] #only takes first thing detected for now
@@ -276,8 +285,10 @@ if __name__=="__main__":
 					#print('***********RECOGNIZE ',name,' *****************' )
 					#print("face detect gives ",initBB)             
 					if not initialized:     
-        					initialized = tracker.init(frame,initBB)
-        					#print(initialized)
+						initialized = tracker.init(frame,initBB)
+						(success, box) = tracker.update(frame)
+						print("should be end of detect looop", success)
+						#print(initialized)
 					#******************************
 			else:
 
@@ -354,6 +365,8 @@ if __name__=="__main__":
 					#print("face detect gives ",initBB)		
 					if not initialized:	
 						initialized = tracker.init(frame,initBB)
+						(success, box) = tracker.update(frame)
+						#(success, box) = tracker.update(frame)
 						#print(initialized)
 					#******************************
 			
