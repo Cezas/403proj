@@ -33,7 +33,7 @@ import cv2
 #from multiprocessing import Process
 #from multiprocessing import Queue
 import numpy as np
-import gettarget as targ
+#import gettarget as targ
 ###############functions##########################
 def inittracker():
 	tracker = cv2.TrackerMOSSE_create()
@@ -133,6 +133,7 @@ if __name__=="__main__":
 	#detectrate = 270  #how many frames pass until object detection force checks again
 	starttime = None #initially none, will be manually determined thru user input
 	usingSSD = False 
+	stuckcounter = 0
 	#*********END TRACKER INIT
 	
 	# load the known faces and embeddings along with OpenCV's Haar
@@ -174,9 +175,9 @@ if __name__=="__main__":
 	framecounter = 0
 	
 	#start pinging the website for the target
-	thread1 = targ.myThread(1, "Thread-1", 1)
+	#thread1 = targ.myThread(1, "Thread-1", 1)
 	# Start new Threads
-	thread1.start()
+	#thread1.start()
 	#thread1.join()
 	
 
@@ -187,7 +188,7 @@ if __name__=="__main__":
 	# loop over frames from the video file stream
 	while True:
 		#constantly read the target file (incase it changes)
-		target = targ.readtarget()
+		#target = targ.readtarget()
 		#print(target)
 		framecounter = framecounter + 1
 		frame = vs.read()
@@ -228,6 +229,13 @@ if __name__=="__main__":
 					lastgoodbox = None
 			if success:
 				(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
+				if lastgoodbox == (x,y,w,h):
+					stuckcounter = stuckcounter + 1
+					if stuckcounter >= 100:
+						success = False
+					print("stuckcounter =",stuckcounter)
+				else:
+					stuckcounter=0	
 				lastgoodbox = (x,y,w,h)
 				centroidx = x+w/2
 				centroidy= y+h/2
@@ -253,7 +261,7 @@ if __name__=="__main__":
 					ser.write(chr(int(w*scalingfactor)).encode())
 					ser.write(chr(int(h*scalingfactor)).encode())
 					ser.write(b'C')
-					time.sleep(1)
+					time.sleep(.1)
 			
 			#disable relockon for now		
 			#elif lastgoodbox is not None:
@@ -274,7 +282,7 @@ if __name__=="__main__":
 		#*******attempt object recognition every N frames and when target is undetected      
 		if framecounter%detectrate==1 or not success: #I use %==1 as %==0 would have this go off a lot initially
 			#print('#######ATTEMPTING DETECTION##########')	
-				
+			stuckcounter = 0	
 			if usingSSD:
 				rects = ssddetect(frame,net,CLASSES,IGNORE)
 				#print(len(rects))
@@ -394,6 +402,7 @@ if __name__=="__main__":
 
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
+			
 			break
 	
 	# do a bit of cleanup
