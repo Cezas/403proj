@@ -33,6 +33,8 @@ import cv2
 #from multiprocessing import Process
 #from multiprocessing import Queue
 import numpy as np
+
+
 #import gettarget as targ
 ###############functions##########################
 def inittracker():
@@ -91,7 +93,10 @@ def ssddetect(frame,net,CLASSES,IGNORE): #only returns 1st detection for now
 			return rects	
 	#print(rects)
 	return rects			
-##############END FUNCCTIONS	
+
+
+
+##############END FUNCTIONS	
 
 
 
@@ -99,22 +104,15 @@ def ssddetect(frame,net,CLASSES,IGNORE): #only returns 1st detection for now
 if __name__=="__main__":		
 	# construct the argument parser and parse the arguments
 	ap = argparse.ArgumentParser()
-	ap.add_argument("-c", "--cascade", required=True,
-		help = "path to the initial haar cascade xml")
-	ap.add_argument("-e", "--encodings", required=True,
-		help="path to serialized db of facial encodings")
-	ap.add_argument("-p", "--prototxt", required=True,
-        	help="path to Caffe 'deploy' prototxt file")
-	ap.add_argument("-m", "--model", required=True,
-        	help="path to Caffe pre-trained model")
-	ap.add_argument("-s", "--serialwrite", required=True,
+	ap.add_argument("-s", "--serialwrite", required=False,
                 help="say yes if writing to serial")
-
 	
 	args = vars(ap.parse_args())
 	
 	#**********INITIALIZING TRACKER & VARIOUS VARS
-	
+	serialwrite = False
+	if args['serialwrite']=='yes':
+		serialwrite = True
 	ser = serial.Serial(    
 	port='/dev/ttyS0',
 	baudrate = 9600,
@@ -139,8 +137,8 @@ if __name__=="__main__":
 	# load the known faces and embeddings along with OpenCV's Haar
 	# cascade for face detection
 	print("[INFO] loading encodings + face detector...")
-	data = pickle.loads(open(args["encodings"], "rb").read())
-	detector = cv2.CascadeClassifier(args["cascade"])
+	data = pickle.loads(open('encodings.pickle', "rb").read())
+	detector = cv2.CascadeClassifier('cascades/haarcascade_frontalface_default.xml')
 	
 	#*********LOADING NET
 
@@ -165,7 +163,7 @@ if __name__=="__main__":
 	
 	#net = cv2.dnn.readNetFromTensorflow('sorted_inference_graph.pb','frost.pbtxt')
 
-	net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"]) #default
+	net = cv2.dnn.readNetFromCaffe('MobileNetSSD_deploy.prototxt.txt', 'MobileNetSSD_deploy.caffemodel') #default
 	#*********END NET
 
 	# initialize the video stream and allow the camera sensor to warm up
@@ -179,12 +177,9 @@ if __name__=="__main__":
 	# Start new Threads
 	#thread1.start()
 	#thread1.join()
-	
 
 
-
-	
-	#********************MAIN ALGO********************
+#********************MAIN ALGO********************
 	# loop over frames from the video file stream
 	while True:
 		#constantly read the target file (incase it changes)
@@ -198,17 +193,14 @@ if __name__=="__main__":
 		innerrects = None
 		# check to see if we are currently tracking an object
 		if initBB is not None:
-			#print('INITBB is',initBB)
 			# grab the new bounding box coordinates of the object
 			#print("right before update", success)
-##################################ERROR#######################################
 			(success, box) =  tracker.update(frame) #does this happen because its too laggy?  frame differences are huge? 
-##################################ERROR###############################3
 			#print("TRACKER gives", box)
                 	# check to see if the tracking was a success
 			#forced redetect on the current tracking frame
 
-			print(success,lastgoodbox,framecounter,redetectrate)
+			#print(success,lastgoodbox,framecounter,redetectrate)
 			if success and framecounter%redetectrate==0 and framecounter >= redetectrate:
 				#print("redetecting")
 				(x, y, w, h) = [int(v) for v in initBB] 
@@ -247,7 +239,7 @@ if __name__=="__main__":
 					success = False
 					
 				#************serial writing, make sure to convert to 0-255 range
-				if args["serialwrite"]=='yes':
+				if serialwrite:
 					scalingfactor = 255/widthsize
 					print(centroidx,centroidy,w,h)
 					#print('converted centx',int(centroidx*scalingfactor))
@@ -382,6 +374,14 @@ if __name__=="__main__":
 		cv2.imshow("Frame", frame)
 		#key = input()
 		key = cv2.waitKey(1) & 0xFF	
+		
+		f = open('target.txt','r')
+		tempkey = f.read()
+		tempkey = ord(tempkey[0])
+		#print(tempkey,key)
+		if tempkey != 10:
+			#print(tempkey)
+			key=tempkey		
 
 		if key == ord("s") and not usingSSD:
 			print('Switching targets, using SSD')
@@ -402,7 +402,9 @@ if __name__=="__main__":
 
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
-			
+			f = open('target.txt','w')
+			f.write('')
+			f.close()
 			break
 	
 	# do a bit of cleanup
