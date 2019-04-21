@@ -223,12 +223,13 @@ if __name__=="__main__":
 				(x, y, w, h) = [int(v) for v in box] #extracting boxes' dimensions and position
 				if lastgoodbox == (x,y,w,h):
 					stuckcounter = stuckcounter + 1
-					if stuckcounter >= 100:
-						success = False
-					print("stuckcounter =",stuckcounter)
+					print(stuckcounter)
 				else:
 					stuckcounter=0	
 				lastgoodbox = (x,y,w,h)
+				if stuckcounter>=100:
+					success=False
+					lastgoodbox=None
 				centroidx = x+w/2
 				centroidy= y+h/2
 				#print(centroidx, widthsize*.9, widthsize*.1)
@@ -379,7 +380,7 @@ if __name__=="__main__":
 		tempkey = f.read()
 		tempkey = ord(tempkey[0])
 		#print(tempkey,key)
-		if tempkey != 10:
+		if tempkey != ord('$'):
 			#print(tempkey)
 			key=tempkey		
 
@@ -403,7 +404,7 @@ if __name__=="__main__":
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
 			f = open('target.txt','w')
-			f.write('')
+			f.write('$')
 			f.close()
 			break
 	
